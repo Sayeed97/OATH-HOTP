@@ -105,6 +105,101 @@ python server.py
 * Works on any machine with Python installed.
 
 ---
+# Code Breakdown
+
+This document explains how the HOTP demo server is structured and how each part of the code works. It is intended for developers who want to understand, modify, or extend the project.
+
+---
+
+## 📂 Project Structure
+
+```
+OATH-HOTP/
+│
+├── server.py        # Main Flask app (routes, logic, DB handling)
+├── models.py        # SQLAlchemy database models
+├── templates/       # HTML templates for user and admin dashboards
+│   ├── user.html
+│   ├── admin.html
+│   └── base.html
+├── static/          # (Optional) CSS/JS files for styling
+├── users.db         # SQLite database (auto-created at runtime)
+└── CODE_BREAKDOWN.md
+```
+
+---
+
+## ⚙️ Key Components
+
+### 1. **`server.py`**
+
+The main application file. Handles:
+
+* Flask routes (`/user`, `/admin`)
+* HOTP verification using **pyotp**
+* Database updates (counters, drift, reset flag)
+* Logging OTP activity
+
+Flow inside `server.py`:
+
+1. Load user details from DB (username, secret, counters).
+2. Generate HOTP object with user’s secret.
+3. Compare submitted OTP with server counter.
+4. Update counters or mark reset flag.
+5. Log verification result.
+
+---
+
+### 2. **`models.py`**
+
+Defines the database schema using SQLAlchemy.
+The `User` model includes:
+
+* `id` → primary key
+* `username` → unique identifier
+* `secret` → base32 encoded HOTP secret
+* `counter` → server-side counter
+* `key_counter` → last counter from device
+* `drift` → tracked mismatch between counters
+* `reset` → flag if secret reset is required
+
+Also includes `Log` model to store the last 10 OTP activity entries.
+
+---
+
+### 3. **Templates (`/templates`)**
+
+HTML files rendered by Flask:
+
+* **`user.html`** → User login page where username and OTP are submitted.
+* **`admin.html`** → Admin dashboard for managing users, viewing counters, drift, reset flags, and logs.
+* **`base.html`** → Shared layout for consistent styling.
+
+Templates use **Jinja2** to dynamically insert data from Flask (like user list, OTP logs).
+
+---
+
+### 4. **Database (`users.db`)**
+
+* SQLite database, auto-created on first run.
+* Stores all users and OTP logs.
+* Updates automatically whenever a user submits an OTP or admin modifies a record.
+
+---
+
+## 🔄 Workflow Breakdown
+
+1. **User submits OTP** on `/user`.
+2. Server checks OTP with `pyotp.HOTP.verify()`.
+3. If:
+
+   * ✅ Exact match → counters increment, drift reset.
+   * ⚠️ Within drift window (e.g., +1 to +5) → OTP accepted, drift recorded.
+   * ❌ Too far ahead or invalid → reset flag set.
+4. Event is logged in the `Log` table.
+5. Admin can review results on `/admin`.
+
+---
 
 ## License
 
@@ -112,4 +207,3 @@ MIT License – feel free to use, modify, and experiment.
 
 ---
 
-If you want, I can now **draft a visually polished README with screenshots, example OTPs, and tips for testing with NFC/GOV keys** so it’s ready for GitHub. Do you want me to do that?
